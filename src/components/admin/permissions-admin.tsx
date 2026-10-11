@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ExportButton } from "@/components/export-button";
 import { useMessages } from "@/components/i18n/locale-provider";
 import { createClient } from "@/lib/supabase/client";
 import type { Permission } from "@/types/database";
@@ -92,6 +93,14 @@ export function PermissionsAdmin({
           Only super admin can add permissions.
         </p>
       )}
+      <div className="flex justify-end">
+        <ExportButton
+          label={messages.exportData}
+          filename="permissions.csv"
+          headers={[messages.code, messages.description]}
+          rows={permissions.map((permission) => [permission.code, permission.description])}
+        />
+      </div>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-start text-slate-500">

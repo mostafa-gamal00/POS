@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ExportButton } from "@/components/export-button";
 import { useMessages } from "@/components/i18n/locale-provider";
 import { createClient } from "@/lib/supabase/client";
 import type { Profile, Role } from "@/types/database";
@@ -66,6 +67,21 @@ export function UsersAdmin({ users, roles, isSuperAdmin }: UsersAdminProps) {
           {message}
         </p>
       ) : null}
+      <div className="flex justify-end">
+        <ExportButton
+          label={messages.exportData}
+          filename="users.csv"
+          headers={[messages.name, messages.email, messages.roles]}
+          rows={users.map((user) => [
+            user.full_name || messages.unnamed,
+            user.email,
+            roles
+              .filter((role) => user.roleIds.includes(role.id))
+              .map((role) => role.name)
+              .join(", "),
+          ])}
+        />
+      </div>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-start text-slate-500">

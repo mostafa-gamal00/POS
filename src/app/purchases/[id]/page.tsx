@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ReceiptPrint } from "@/components/receipts/receipt-print";
 import { requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, formatEnteredPurchaseMoney, formatPurchaseMoney } from "@/lib/utils";
+import { formatDateTime, formatEnteredPurchaseMoney, formatMoney, formatPurchaseMoney } from "@/lib/utils";
 import type { Purchase, PurchaseItem, ShopSettings } from "@/types/database";
 
 type PageProps = {
@@ -47,10 +48,42 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
       locale={locale}
       title={`${messages.navPurchases} ${purchaseRow.receipt_number}`}
     >
-      <div className="print:hidden mb-4">
+      <div className="print:hidden mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link href="/purchases" className="text-sm text-slate-600 underline">
           {messages.backToPurchases}
         </Link>
+        <ExportButton
+          label={messages.exportData}
+          filename={`${purchaseRow.receipt_number}.csv`}
+          headers={[
+            messages.product,
+            messages.qty,
+            messages.unitCost,
+            messages.lineTotal,
+            messages.serial,
+            messages.currency,
+            messages.enteredPrice,
+            messages.transportation,
+          ]}
+          rows={purchaseItems.map((item) => [
+            item.products?.name ?? "",
+            String(item.qty),
+            hasCurrencyInvoice
+              ? formatPurchaseMoney(Number(item.unit_cost), "EGP", locale)
+              : formatMoney(Number(item.unit_cost)),
+            hasCurrencyInvoice
+              ? formatPurchaseMoney(Number(item.line_total), "EGP", locale)
+              : formatMoney(Number(item.line_total)),
+            item.serial ?? "",
+            item.currency ?? "",
+            item.currency && item.unit_price != null
+              ? formatPurchaseMoney(Number(item.unit_price), item.currency, locale)
+              : "",
+            item.transport_egp != null
+              ? formatPurchaseMoney(Number(item.transport_egp), "EGP", locale)
+              : "",
+          ])}
+        />
       </div>
       <ReceiptPrint
         title={messages.purchaseReceipt}

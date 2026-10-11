@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { requirePermission } from "@/lib/auth";
 import { fill } from "@/lib/i18n";
@@ -80,7 +81,15 @@ export default async function DashboardPage() {
         </div>
       </div>
       <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-teal-950">{messages.lowStock}</h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-teal-950">{messages.lowStock}</h3>
+          <ExportButton
+            label={messages.exportData}
+            filename="low-stock.csv"
+            headers={[messages.product, messages.stock]}
+            rows={lowStockProducts.map((product) => [product.name, String(product.stock_qty)])}
+          />
+        </div>
         {lowStockProducts.length === 0 ? (
           <p className="mt-3 text-sm text-stone-500">{messages.allAboveThreshold}</p>
         ) : (

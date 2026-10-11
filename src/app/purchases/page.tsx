@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ViewLink } from "@/components/products/view-link";
 import { hasPermission, requirePermission } from "@/lib/auth";
@@ -17,15 +18,67 @@ export default async function PurchasesPage() {
     .from("purchases")
     .select("*, suppliers(id, name), purchase_items(category_id, categories(name))")
     .order("created_at", { ascending: false })
-    .limit(100);
-  const purchases = (data ?? []) as Array<
+    .limit(10000);
+  const allPurchases = (data ?? []) as Array<
     Purchase & {
       purchase_items?: Array<{ categories?: { name: string } | null }>;
     }
   >;
+  const purchases = allPurchases.slice(0, 100);
+  function purchaseCategories(purchase: (typeof allPurchases)[number]): string {
+    return (
+      [
+        ...new Set(
+          (purchase.purchase_items ?? [])
+            .map((item) => item.categories?.name)
+            .filter((name): name is string => Boolean(name)),
+        ),
+      ].join(", ") || messages.uncategorized
+    );
+  }
   return (
     <AppShell auth={auth} locale={locale} title={messages.navPurchases}>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <ExportButton
+          label={messages.exportData}
+          filename="purchases.csv"
+          headers={[
+            messages.receipt,
+            messages.supplier,
+            messages.date,
+            messages.category,
+            messages.invoiceTotal,
+            messages.exchangeRate,
+            messages.transportation,
+            messages.totalCost,
+          ]}
+          rows={allPurchases.map((purchase) => [
+            purchase.receipt_number,
+            purchase.suppliers?.name ?? "",
+            formatDateTime(purchase.created_at),
+            purchaseCategories(purchase),
+            purchase.invoice_total_egp != null
+              ? formatEnteredPurchaseMoney(
+                  purchase.invoice_currency,
+                  purchase.invoice_total_sar,
+                  purchase.invoice_total_egp,
+                  locale,
+                )
+              : "",
+            purchase.exchange_rate != null ? String(Number(purchase.exchange_rate)) : "",
+            purchase.invoice_total_egp != null
+              ? formatEnteredPurchaseMoney(
+                  purchase.transport_currency,
+                  purchase.transport_sar,
+                  purchase.transport_egp,
+                  locale,
+                )
+              : "",
+            purchase.invoice_total_egp != null
+              ? formatPurchaseMoney(purchase.invoice_total_egp, "EGP", locale)
+              : formatMoney(Number(purchase.total_cost)),
+          ])}
+        />
         {canManage ? (
           <Link
             href="/purchases/new"
@@ -60,15 +113,7 @@ export default async function PurchasesPage() {
                 <td className="px-4 py-3">
                   {formatDateTime(purchase.created_at)}
                 </td>
-                <td className="px-4 py-3">
-                  {[
-                    ...new Set(
-                      (purchase.purchase_items ?? [])
-                        .map((item) => item.categories?.name)
-                        .filter((name): name is string => Boolean(name)),
-                    ),
-                  ].join(", ") || messages.uncategorized}
-                </td>
+                <td className="px-4 py-3">{purchaseCategories(purchase)}</td>
                 <td className="px-4 py-3 tabular-nums">
                   {purchase.invoice_total_egp != null
                     ? formatEnteredPurchaseMoney(

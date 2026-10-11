@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProductImage } from "@/components/products/product-image";
 import { hasPermission, requirePermission } from "@/lib/auth";
@@ -56,14 +57,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
             <dd>{product.is_active ? messages.active : messages.inactive}</dd>
           </div>
         </dl>
-        {canManage ? (
-          <Link
-            href={`/products/${product.id}/edit`}
-            className="mt-6 inline-block rounded-md bg-teal-900 px-3 py-2 text-sm font-medium text-white"
-          >
-            {messages.edit}
-          </Link>
-        ) : null}
+        <div className="mt-6 flex flex-wrap gap-2">
+          <ExportButton
+            label={messages.exportData}
+            filename={`${product.name.replace(/[\\/:*?"<>|]/g, "-")}.csv`}
+            headers={[
+              messages.name,
+              messages.serial,
+              messages.category,
+              messages.price,
+              messages.stock,
+              messages.status,
+            ]}
+            rows={[
+              [
+                product.name,
+                product.serial ?? "",
+                product.categories?.name ?? messages.uncategorized,
+                formatMoney(Number(product.price)),
+                String(product.stock_qty),
+                product.is_active ? messages.active : messages.inactive,
+              ],
+            ]}
+          />
+          {canManage ? (
+            <Link
+              href={`/products/${product.id}/edit`}
+              className="rounded-md bg-teal-900 px-3 py-2 text-sm font-medium text-white"
+            >
+              {messages.edit}
+            </Link>
+          ) : null}
+        </div>
       </div>
     </AppShell>
   );

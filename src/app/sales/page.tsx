@@ -1,3 +1,4 @@
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ViewLink } from "@/components/products/view-link";
 import { requirePermission } from "@/lib/auth";
@@ -15,10 +16,24 @@ export default async function SalesPage() {
     .from("sales")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(100);
-  const sales = (data ?? []) as Sale[];
+    .limit(10000);
+  const allSales = (data ?? []) as Sale[];
+  const sales = allSales.slice(0, 100);
   return (
     <AppShell auth={auth} locale={locale} title={messages.navSales}>
+      <div className="mb-4 flex justify-end">
+        <ExportButton
+          label={messages.exportData}
+          filename="sales.csv"
+          headers={[messages.receipt, messages.date, messages.payment, messages.total]}
+          rows={allSales.map((sale) => [
+            sale.receipt_number,
+            formatDateTime(sale.created_at),
+            messages[sale.payment_method],
+            formatMoney(Number(sale.total_amount)),
+          ])}
+        />
+      </div>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-start text-slate-500">

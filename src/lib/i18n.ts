@@ -164,6 +164,9 @@ export const en = {
   currencyEgp: "EGP",
   currencySar: "SAR",
   enteredPrice: "Entered price",
+  exportData: "Export",
+  yes: "Yes",
+  no: "No",
 } as const;
 
 export type Messages = { [Key in keyof typeof en]: string };
@@ -330,6 +333,9 @@ export const ar: Messages = {
   currencyEgp: "ج.م",
   currencySar: "ر.س",
   enteredPrice: "السعر المدخل",
+  exportData: "تصدير",
+  yes: "نعم",
+  no: "لا",
 };
 
 export function messagesFor(locale: Locale): Messages {

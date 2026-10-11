@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ReceiptPrint } from "@/components/receipts/receipt-print";
 import { requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatMoney } from "@/lib/utils";
 import type { Sale, SaleItem, ShopSettings } from "@/types/database";
 
 type PageProps = {
@@ -42,10 +43,21 @@ export default async function SaleDetailPage({ params }: PageProps) {
       locale={locale}
       title={`${messages.navSales} ${saleRow.receipt_number}`}
     >
-      <div className="print:hidden mb-4">
+      <div className="print:hidden mb-4 flex flex-wrap items-center justify-between gap-3">
         <Link href="/sales" className="text-sm text-slate-600 underline">
           {messages.backToSales}
         </Link>
+        <ExportButton
+          label={messages.exportData}
+          filename={`${saleRow.receipt_number}.csv`}
+          headers={[messages.product, messages.qty, messages.unitPrice, messages.lineTotal]}
+          rows={saleItems.map((item) => [
+            item.products?.name ?? "",
+            String(item.qty),
+            formatMoney(Number(item.unit_price)),
+            formatMoney(Number(item.line_total)),
+          ])}
+        />
       </div>
       <ReceiptPrint
         title={messages.saleReceipt}

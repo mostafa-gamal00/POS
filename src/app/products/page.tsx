@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { CategoryForm } from "@/components/products/category-form";
 import { ViewLink } from "@/components/products/view-link";
@@ -39,14 +40,42 @@ export default async function ProductsPage() {
         <p className="text-sm text-slate-600">
           {fill(messages.productsCount, { count: products.length })}
         </p>
-        {canManage ? (
-          <Link
-            href="/products/new"
-            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
-          >
-            {messages.addProduct}
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <ExportButton
+            label={messages.exportData}
+            filename="products.csv"
+            headers={[
+              messages.name,
+              messages.category,
+              messages.sku,
+              messages.serial,
+              messages.barcode,
+              messages.price,
+              messages.cost,
+              messages.stock,
+              messages.status,
+            ]}
+            rows={products.map((product) => [
+              product.name,
+              product.categories?.name ?? messages.uncategorized,
+              product.sku ?? "",
+              product.serial ?? "",
+              product.barcode ?? "",
+              formatMoney(Number(product.price)),
+              product.cost == null ? "" : formatMoney(Number(product.cost)),
+              String(product.stock_qty),
+              product.is_active ? messages.active : messages.inactive,
+            ])}
+          />
+          {canManage ? (
+            <Link
+              href="/products/new"
+              className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+            >
+              {messages.addProduct}
+            </Link>
+          ) : null}
+        </div>
       </div>
       {canManage ? (
         <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

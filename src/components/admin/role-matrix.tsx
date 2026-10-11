@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ExportButton } from "@/components/export-button";
 import { useMessages } from "@/components/i18n/locale-provider";
 import { createClient } from "@/lib/supabase/client";
 import type { Permission, Role } from "@/types/database";
@@ -130,6 +131,23 @@ export function RoleMatrix({
           {messages.rolesAdminOnly}
         </p>
       )}
+      <div className="flex justify-end">
+        <ExportButton
+          label={messages.exportData}
+          filename="roles.csv"
+          headers={[messages.roles, messages.permission, messages.code, messages.status]}
+          rows={permissions.flatMap((permission) =>
+            roles.map((role) => [
+              role.name,
+              permission.name,
+              permission.code,
+              (rolePermissionMap[role.id] ?? []).includes(permission.id)
+                ? messages.yes
+                : messages.no,
+            ]),
+          )}
+        />
+      </div>
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-xs">
           <thead className="bg-slate-50 text-start text-slate-500">

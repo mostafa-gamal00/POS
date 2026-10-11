@@ -1,3 +1,4 @@
+import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { StockAdjustForm } from "@/components/products/stock-adjust-form";
 import { requirePermission } from "@/lib/auth";
@@ -24,7 +25,15 @@ export default async function StockPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <StockAdjustForm products={products} />
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-lg font-medium">{messages.lowStock}</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-lg font-medium">{messages.lowStock}</h3>
+            <ExportButton
+              label={messages.exportData}
+              filename="low-stock.csv"
+              headers={[messages.product, messages.stock]}
+              rows={lowStock.map((product) => [product.name, String(product.stock_qty)])}
+            />
+          </div>
           {lowStock.length === 0 ? (
             <p className="mt-3 text-sm text-slate-500">{messages.noLowStock}</p>
           ) : (
