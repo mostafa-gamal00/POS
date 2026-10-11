@@ -21,6 +21,7 @@ export default async function NewPurchasePage() {
         products={(products ?? []) as Product[]}
         suppliers={(suppliers ?? []) as Supplier[]}
         categories={(categories ?? []) as Category[]}
+        locale={locale}
       />
     </AppShell>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cn, formatDateTime, formatMoney } from "./utils";
+import { cn, formatDateTime, formatMoney, formatPurchaseMoney } from "./utils";
 
 describe("formatMoney", () => {
   it("formats a number as USD", () => {
@@ -12,6 +12,15 @@ describe("formatMoney", () => {
 
   it("formats a non-numeric string as zero", () => {
     expect(formatMoney("nope")).toBe("$0.00");
+  });
+});
+
+describe("formatPurchaseMoney", () => {
+  it("labels Egyptian pounds and riyals in English and Arabic", () => {
+    expect(formatPurchaseMoney(135, "EGP", "en")).toBe("EGP 135.00");
+    expect(formatPurchaseMoney(135, "EGP", "ar")).toBe("135.00 ج.م");
+    expect(formatPurchaseMoney(10, "SAR", "en")).toBe("SAR 10.00");
+    expect(formatPurchaseMoney(10, "SAR", "ar")).toBe("10.00 ر.س");
   });
 });
 

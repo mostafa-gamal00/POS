@@ -1,12 +1,15 @@
 "use client";
 
 import { useMessages } from "@/components/i18n/locale-provider";
+import type { Locale } from "@/lib/i18n";
+import { formatPurchaseMoney } from "@/lib/utils";
 
 type ReceiptLine = {
   name: string;
   qty: number;
   unitPrice: number;
   lineTotal: number;
+  detailLines?: string[];
 };
 
 type ReceiptPrintProps = {
@@ -19,6 +22,8 @@ type ReceiptPrintProps = {
   priceLabel?: string;
   totalLabel: string;
   totalAmount: number;
+  amountCurrency?: "USD" | "EGP";
+  locale?: Locale;
   meta?: Array<{ label: string; value: string }>;
 };
 
@@ -39,9 +44,17 @@ export function ReceiptPrint({
   priceLabel,
   totalLabel,
   totalAmount,
+  amountCurrency = "USD",
+  locale = "en",
   meta = [],
 }: ReceiptPrintProps) {
   const messages = useMessages();
+  function amount(value: number): string {
+    if (amountCurrency === "EGP") {
+      return formatPurchaseMoney(value, "EGP", locale);
+    }
+    return formatMoney(value);
+  }
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div className="print:hidden mb-4 flex justify-end">
@@ -82,17 +95,24 @@ export function ReceiptPrint({
           <tbody>
             {lines.map((line, index) => (
               <tr key={`${line.name}-${index}`} className="border-b border-slate-100">
-                <td className="py-2">{line.name}</td>
+                <td className="py-2">
+                  <div>{line.name}</div>
+                  {line.detailLines?.map((detail) => (
+                    <p key={detail} className="text-xs text-slate-500">
+                      {detail}
+                    </p>
+                  ))}
+                </td>
                 <td className="py-2">{line.qty}</td>
-                <td className="py-2">{formatMoney(line.unitPrice)}</td>
-                <td className="py-2 text-end">{formatMoney(line.lineTotal)}</td>
+                <td className="py-2 tabular-nums">{amount(line.unitPrice)}</td>
+                <td className="py-2 text-end tabular-nums">{amount(line.lineTotal)}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="mt-4 flex justify-between border-t border-slate-300 pt-3 text-base font-semibold">
           <span>{totalLabel}</span>
-          <span>{formatMoney(totalAmount)}</span>
+          <span className="tabular-nums">{amount(totalAmount)}</span>
         </div>
         <p className="mt-6 text-center text-xs text-slate-500">{footer}</p>
       </div>

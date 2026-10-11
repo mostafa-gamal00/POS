@@ -4,7 +4,7 @@ import { ViewLink } from "@/components/products/view-link";
 import { hasPermission, requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, formatMoney } from "@/lib/utils";
+import { formatDateTime, formatMoney, formatPurchaseMoney } from "@/lib/utils";
 import type { Purchase } from "@/types/database";
 
 export default async function PurchasesPage() {
@@ -35,7 +35,7 @@ export default async function PurchasesPage() {
           </Link>
         ) : null}
       </div>
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-start text-slate-500">
             <tr>
@@ -43,6 +43,9 @@ export default async function PurchasesPage() {
               <th className="px-4 py-3 font-medium">{messages.supplier}</th>
               <th className="px-4 py-3 font-medium">{messages.date}</th>
               <th className="px-4 py-3 font-medium">{messages.category}</th>
+              <th className="px-4 py-3 font-medium">{messages.invoiceTotal}</th>
+              <th className="px-4 py-3 font-medium">{messages.exchangeRate}</th>
+              <th className="px-4 py-3 font-medium">{messages.transportation}</th>
               <th className="px-4 py-3 font-medium">{messages.totalCost}</th>
               <th className="px-4 py-3 font-medium">{messages.view}</th>
             </tr>
@@ -66,8 +69,23 @@ export default async function PurchasesPage() {
                     ),
                   ].join(", ") || messages.uncategorized}
                 </td>
-                <td className="px-4 py-3">
-                  {formatMoney(Number(purchase.total_cost))}
+                <td className="px-4 py-3 tabular-nums">
+                  {purchase.invoice_total_sar != null
+                    ? formatPurchaseMoney(purchase.invoice_total_sar, "SAR", locale)
+                    : "—"}
+                </td>
+                <td className="px-4 py-3 tabular-nums" dir="ltr">
+                  {purchase.exchange_rate != null ? Number(purchase.exchange_rate) : "—"}
+                </td>
+                <td className="px-4 py-3 tabular-nums">
+                  {purchase.transport_sar != null
+                    ? formatPurchaseMoney(purchase.transport_sar, "SAR", locale)
+                    : "—"}
+                </td>
+                <td className="px-4 py-3 tabular-nums">
+                  {purchase.invoice_total_egp != null
+                    ? formatPurchaseMoney(purchase.invoice_total_egp, "EGP", locale)
+                    : formatMoney(Number(purchase.total_cost))}
                 </td>
                 <td className="px-4 py-3">
                   <ViewLink href={`/purchases/${purchase.id}`} label={messages.view} />

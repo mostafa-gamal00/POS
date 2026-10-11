@@ -93,6 +93,8 @@ export type SaleItem = {
   products?: Pick<Product, "id" | "name" | "sku"> | null;
 };
 
+export type PurchaseCurrency = "EGP" | "SAR";
+
 export type Purchase = {
   id: string;
   receipt_number: string;
@@ -100,6 +102,11 @@ export type Purchase = {
   received_by: string;
   total_cost: number;
   notes: string | null;
+  invoice_total_sar: number | null;
+  exchange_rate: number | null;
+  invoice_total_egp: number | null;
+  transport_sar: number | null;
+  transport_egp: number | null;
   created_at: string;
   suppliers?: Pick<Supplier, "id" | "name"> | null;
 };
@@ -112,6 +119,9 @@ export type PurchaseItem = {
   qty: number;
   unit_cost: number;
   line_total: number;
+  currency: PurchaseCurrency | null;
+  unit_price: number | null;
+  transport_egp: number | null;
   products?: Pick<Product, "id" | "name" | "sku"> | null;
 };
 
