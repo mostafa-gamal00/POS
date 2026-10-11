@@ -51,6 +51,7 @@ export type Product = {
   category_id: string | null;
   name: string;
   sku: string | null;
+  serial: string | null;
   barcode: string | null;
   price: number;
   cost: number | null;
@@ -103,9 +104,11 @@ export type Purchase = {
   total_cost: number;
   notes: string | null;
   invoice_total_sar: number | null;
+  invoice_currency: PurchaseCurrency | null;
   exchange_rate: number | null;
   invoice_total_egp: number | null;
   transport_sar: number | null;
+  transport_currency: PurchaseCurrency | null;
   transport_egp: number | null;
   created_at: string;
   suppliers?: Pick<Supplier, "id" | "name"> | null;
@@ -122,6 +125,7 @@ export type PurchaseItem = {
   currency: PurchaseCurrency | null;
   unit_price: number | null;
   transport_egp: number | null;
+  serial: string | null;
   products?: Pick<Product, "id" | "name" | "sku"> | null;
 };
 

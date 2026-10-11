@@ -5,7 +5,7 @@ import { ReceiptPrint } from "@/components/receipts/receipt-print";
 import { requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, formatPurchaseMoney } from "@/lib/utils";
+import { formatDateTime, formatEnteredPurchaseMoney, formatPurchaseMoney } from "@/lib/utils";
 import type { Purchase, PurchaseItem, ShopSettings } from "@/types/database";
 
 type PageProps = {
@@ -36,7 +36,7 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
   }
   const purchaseRow = purchase as Purchase;
   const purchaseItems = (items ?? []) as PurchaseItem[];
-  const hasCurrencyInvoice = purchaseRow.invoice_total_sar != null;
+  const hasCurrencyInvoice = purchaseRow.invoice_total_egp != null;
   const shop = (settings ?? {
     shop_name: "My Shop",
     receipt_footer: "Goods received",
@@ -72,19 +72,29 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
             ? [
                 {
                   label: messages.invoiceTotal,
-                  value: formatPurchaseMoney(Number(purchaseRow.invoice_total_sar), "SAR", locale),
+                  value: formatEnteredPurchaseMoney(
+                    purchaseRow.invoice_currency,
+                    purchaseRow.invoice_total_sar,
+                    purchaseRow.invoice_total_egp,
+                    locale,
+                  ),
                 },
-                {
-                  label: messages.exchangeRate,
-                  value: String(Number(purchaseRow.exchange_rate)),
-                },
+                ...(purchaseRow.exchange_rate != null
+                  ? [
+                      {
+                        label: messages.exchangeRate,
+                        value: String(Number(purchaseRow.exchange_rate)),
+                      },
+                    ]
+                  : []),
                 {
                   label: messages.transportation,
-                  value: formatPurchaseMoney(Number(purchaseRow.transport_sar), "SAR", locale),
-                },
-                {
-                  label: `${messages.transportation} (${messages.currencyEgp})`,
-                  value: formatPurchaseMoney(Number(purchaseRow.transport_egp), "EGP", locale),
+                  value: formatEnteredPurchaseMoney(
+                    purchaseRow.transport_currency,
+                    purchaseRow.transport_sar,
+                    purchaseRow.transport_egp,
+                    locale,
+                  ),
                 },
               ]
             : []),
@@ -94,13 +104,15 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
           qty: item.qty,
           unitPrice: Number(item.unit_cost),
           lineTotal: Number(item.line_total),
-          detailLines:
-            item.currency && item.unit_price != null
+          detailLines: [
+            ...(item.currency && item.unit_price != null
               ? [
                   `${messages.enteredPrice}: ${formatPurchaseMoney(Number(item.unit_price), item.currency, locale)}`,
                   `${messages.transportation}: ${formatPurchaseMoney(Number(item.transport_egp ?? 0), "EGP", locale)}`,
                 ]
-              : undefined,
+              : []),
+            ...(item.serial ? [`${messages.serial}: ${item.serial}`] : []),
+          ],
         }))}
       />
     </AppShell>

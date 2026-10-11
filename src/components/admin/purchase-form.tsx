@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "@/components/i18n/locale-provider";
 import { fill, type Locale } from "@/lib/i18n";
+import { filterProducts, resolveProductChoice } from "@/lib/product-search";
 import {
   quotePurchaseInvoice,
   type PurchaseCurrency,
@@ -22,23 +23,62 @@ type PurchaseFormProps = {
 
 type Line = {
   productId: string;
+  productQuery: string;
   categoryId: string;
   qty: string;
   unitPrice: string;
   currency: PurchaseCurrency;
+  serial: string;
 };
 
 const fieldClass =
-  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-800 focus:ring-2 focus:ring-teal-800/15";
+  "w-full rounded-lg border-2 border-stone-950 bg-white px-3 py-3 text-base text-stone-950 outline-none focus:border-teal-800 focus:ring-2 focus:ring-teal-800/30";
 
 function blankLine(product?: Product): Line {
   return {
     productId: product?.id ?? "",
+    productQuery: product?.name ?? "",
     categoryId: product?.category_id ?? "",
     qty: "1",
     unitPrice: "",
-    currency: "SAR",
+    currency: "EGP",
+    serial: "",
   };
+}
+
+function CurrencyChoice({
+  value,
+  onChange,
+  egpLabel,
+  sarLabel,
+}: {
+  value: PurchaseCurrency;
+  onChange: (currency: PurchaseCurrency) => void;
+  egpLabel: string;
+  sarLabel: string;
+}) {
+  return (
+    <div className="grid grid-cols-2 rounded-lg border-2 border-stone-950 p-1" role="group">
+      {(["EGP", "SAR"] as const).map((currency) => {
+        const selected = value === currency;
+        return (
+          <button
+            key={currency}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(currency)}
+            className={
+              selected
+                ? "rounded-md bg-stone-950 py-3 text-base font-semibold text-white"
+                : "rounded-md py-3 text-base font-medium text-stone-950"
+            }
+          >
+            {currency === "EGP" ? egpLabel : sarLabel}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function moneyOrDash(
@@ -57,9 +97,11 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
   const messages = useMessages();
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [notes, setNotes] = useState("");
-  const [invoiceTotalSar, setInvoiceTotalSar] = useState("");
+  const [invoiceTotal, setInvoiceTotal] = useState("");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<PurchaseCurrency>("EGP");
   const [exchangeRate, setExchangeRate] = useState("");
-  const [transportSar, setTransportSar] = useState("0");
+  const [transport, setTransport] = useState("0");
+  const [transportCurrency, setTransportCurrency] = useState<PurchaseCurrency>("EGP");
   const [lines, setLines] = useState<Line[]>([blankLine(products[0])]);
   const [newSupplierName, setNewSupplierName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -67,24 +109,19 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
   const quote = useMemo(
     () =>
       quotePurchaseInvoice({
-        invoiceTotalSar,
+        invoiceTotal,
+        invoiceCurrency,
         exchangeRate,
-        transportSar,
+        transport,
+        transportCurrency,
         lines: lines.map((line) => ({
           qty: Number(line.qty),
           unitPrice: line.unitPrice,
           currency: line.currency,
         })),
       }),
-    [exchangeRate, invoiceTotalSar, lines, transportSar],
+    [exchangeRate, invoiceCurrency, invoiceTotal, lines, transport, transportCurrency],
   );
-  const productGroups = useMemo(() => {
-    return products.reduce<Record<string, Product[]>>((groups, product) => {
-      const key = product.categories?.name ?? messages.uncategorized;
-      groups[key] = [...(groups[key] ?? []), product];
-      return groups;
-    }, {});
-  }, [messages.uncategorized, products]);
   function updateLine(index: number, patch: Partial<Line>) {
     setLines((current) =>
       current.map((line, i) => (i === index ? { ...line, ...patch } : line)),
@@ -125,6 +162,54 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
     }
     return data.id as string;
   }
+  async function ensureLineProducts(
+    supabase: ReturnType<typeof createClient>,
+  ): Promise<string[]> {
+    const ids: string[] = [];
+    const known = products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      barcode: product.barcode,
+    }));
+    for (const line of lines) {
+      const choice = resolveProductChoice(known, line.productId, line.productQuery);
+      if (choice.kind === "missing") {
+        throw new Error(messages.product);
+      }
+      if (choice.kind === "existing") {
+        ids.push(choice.id);
+        continue;
+      }
+      if (!line.categoryId) {
+        throw new Error(messages.categoryRequired);
+      }
+      const { data, error: insertError } = await supabase
+        .from("products")
+        .insert({
+          name: choice.name,
+          category_id: line.categoryId,
+          price: 0,
+          stock_qty: 0,
+          serial: line.serial.trim() || null,
+          is_active: true,
+        })
+        .select("id")
+        .single();
+      if (insertError || !data) {
+        throw new Error(insertError?.message ?? messages.purchaseSaveFailed);
+      }
+      const createdId = String(data.id);
+      known.push({
+        id: createdId,
+        name: choice.name,
+        sku: null,
+        barcode: null,
+      });
+      ids.push(createdId);
+    }
+    return ids;
+  }
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!quote.isBalanced) {
@@ -133,20 +218,32 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
     setIsSaving(true);
     setError(null);
     try {
+      const serials = lines
+        .map((line) => line.serial.trim().toLowerCase())
+        .filter((serial) => serial.length > 0);
+      if (new Set(serials).size !== serials.length) {
+        setError(messages.duplicateSerial);
+        setIsSaving(false);
+        return;
+      }
       const resolvedSupplierId = await ensureSupplier();
       const supabase = createClient();
+      const productIds = await ensureLineProducts(supabase);
       const { data, error: rpcError } = await supabase.rpc("create_purchase", {
         p_supplier_id: resolvedSupplierId,
         p_notes: notes || null,
-        p_invoice_total_sar: quote.invoiceTotalSar,
-        p_exchange_rate: quote.exchangeRate,
-        p_transport_sar: quote.transportSar,
+        p_invoice_total: quote.invoiceTotal,
+        p_invoice_currency: quote.invoiceCurrency,
+        p_exchange_rate: quote.needsRate ? quote.exchangeRate : "",
+        p_transport: quote.transport,
+        p_transport_currency: quote.transportCurrency,
         p_items: lines.map((line, index) => ({
-          product_id: line.productId,
+          product_id: productIds[index],
           category_id: line.categoryId || null,
           qty: Number(line.qty),
           unit_price: quote.lines[index]?.unitPrice ?? line.unitPrice,
           currency: line.currency,
+          serial: line.serial.trim(),
         })),
       });
       if (rpcError) {
@@ -175,11 +272,11 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
           });
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-4 pb-8">
-      <section className="space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-teal-950">{messages.invoiceSection}</h3>
+      <section className="space-y-4 rounded-2xl border-4 border-teal-900 bg-white p-5">
+        <h3 className="text-xl font-semibold text-stone-950">{messages.invoiceSection}</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="mb-1 block text-stone-600">{messages.supplier}</span>
+          <label className="block text-base">
+            <span className="mb-1 block font-semibold text-stone-950">{messages.supplier}</span>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
@@ -194,8 +291,8 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
             </select>
           </label>
           {!supplierId ? (
-            <label className="block text-sm">
-              <span className="mb-1 block text-stone-600">{messages.newSupplierName}</span>
+            <label className="block text-base">
+              <span className="mb-1 block font-semibold text-stone-950">{messages.newSupplierName}</span>
               <input
                 className={fieldClass}
                 value={newSupplierName}
@@ -204,68 +301,84 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
               />
             </label>
           ) : null}
-          <label className="block text-sm">
-            <span className="mb-1 block text-stone-600">
-              {messages.invoiceTotal} ({messages.currencySar})
-            </span>
+          <div className="block text-base">
+            <span className="mb-1 block font-semibold text-stone-950">{messages.invoiceTotal}</span>
+            <CurrencyChoice
+              value={invoiceCurrency}
+              onChange={setInvoiceCurrency}
+              egpLabel={messages.currencyEgp}
+              sarLabel={messages.currencySar}
+            />
             <input
               dir="ltr"
               inputMode="decimal"
-              className={`${fieldClass} tabular-nums`}
-              value={invoiceTotalSar}
-              onChange={(e) => setInvoiceTotalSar(e.target.value)}
+              className={`${fieldClass} mt-2 tabular-nums`}
+              value={invoiceTotal}
+              onChange={(e) => setInvoiceTotal(e.target.value)}
               required
             />
-            <span className="mt-1 block text-xs text-stone-500">
-              {quote.invoiceKnown
-                ? fill(messages.equalsAmount, {
-                    amount: formatPurchaseCents(quote.invoiceTotalEgpCents, "EGP", locale),
-                  })
-                : messages.exchangeRateHint}
-            </span>
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-stone-600">{messages.exchangeRate}</span>
-            <input
-              dir="ltr"
-              inputMode="decimal"
-              className={`${fieldClass} tabular-nums`}
-              value={exchangeRate}
-              onChange={(e) => setExchangeRate(e.target.value)}
-              placeholder="13.50"
-              required
-            />
-            {quote.hasRate ? (
-              <span className="mt-1 block text-xs text-stone-500" dir="ltr">
-                {`1 ${messages.currencySar} = ${quote.exchangeRate} ${messages.currencyEgp}`}
+            {invoiceCurrency === "SAR" ? (
+              <span className="mt-1 block text-sm font-medium text-stone-800">
+                {quote.invoiceKnown
+                  ? fill(messages.equalsAmount, {
+                      amount: formatPurchaseCents(quote.invoiceTotalEgpCents, "EGP", locale),
+                    })
+                  : messages.exchangeRateHint}
               </span>
-            ) : (
-              <span className="mt-1 block text-xs text-stone-500">{messages.exchangeRateHint}</span>
-            )}
-          </label>
-          <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-stone-600">
-              {messages.transportation} ({messages.currencySar})
-            </span>
+            ) : null}
+          </div>
+          {quote.needsRate ? (
+            <label className="block text-base">
+              <span className="mb-1 block font-semibold text-stone-950">{messages.exchangeRate}</span>
+              <input
+                dir="ltr"
+                inputMode="decimal"
+                className={`${fieldClass} tabular-nums`}
+                value={exchangeRate}
+                onChange={(e) => setExchangeRate(e.target.value)}
+                placeholder="13.50"
+                required
+              />
+              {quote.hasRate ? (
+                <span className="mt-1 block text-sm font-medium text-stone-800" dir="ltr">
+                  {`1 ${messages.currencySar} = ${quote.exchangeRate} ${messages.currencyEgp}`}
+                </span>
+              ) : (
+                <span className="mt-1 block text-sm font-medium text-stone-800">
+                  {messages.exchangeRateHint}
+                </span>
+              )}
+            </label>
+          ) : null}
+          <div className="block text-base sm:col-span-2">
+            <span className="mb-1 block font-semibold text-stone-950">{messages.transportation}</span>
+            <CurrencyChoice
+              value={transportCurrency}
+              onChange={setTransportCurrency}
+              egpLabel={messages.currencyEgp}
+              sarLabel={messages.currencySar}
+            />
             <input
               dir="ltr"
               inputMode="decimal"
-              className={`${fieldClass} tabular-nums`}
-              value={transportSar}
-              onChange={(e) => setTransportSar(e.target.value)}
+              className={`${fieldClass} mt-2 tabular-nums`}
+              value={transport}
+              onChange={(e) => setTransport(e.target.value)}
               required
             />
-            <span className="mt-1 block text-xs text-stone-500">
-              {quote.transportKnown
-                ? fill(messages.equalsAmount, {
-                    amount: formatPurchaseCents(quote.transportEgpCents, "EGP", locale),
-                  })
-                : messages.exchangeRateHint}
-            </span>
-          </label>
+            {transportCurrency === "SAR" ? (
+              <span className="mt-1 block text-sm font-medium text-stone-800">
+                {quote.transportKnown
+                  ? fill(messages.equalsAmount, {
+                      amount: formatPurchaseCents(quote.transportEgpCents, "EGP", locale),
+                    })
+                  : messages.exchangeRateHint}
+              </span>
+            ) : null}
+          </div>
         </div>
-        <label className="block text-sm">
-          <span className="mb-1 block text-stone-600">{messages.notes}</span>
+        <label className="block text-base">
+          <span className="mb-1 block font-semibold text-stone-950">{messages.notes}</span>
           <textarea
             className={fieldClass}
             value={notes}
@@ -274,43 +387,61 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
           />
         </label>
       </section>
-      <section className="space-y-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-teal-950">{messages.productsSection}</h3>
+      <section className="space-y-3 rounded-2xl border-4 border-amber-700 bg-white p-5">
+        <h3 className="text-xl font-semibold text-stone-950">{messages.productsSection}</h3>
         {products.length === 0 ? (
-          <p className="text-sm text-stone-500">{messages.noProducts}</p>
+          <p className="text-base font-medium text-stone-950">{messages.noProducts}</p>
         ) : null}
         {lines.map((line, index) => {
           const quoted = quote.lines[index];
           const hint = quoted ? transportHint(quoted) : null;
           return (
-            <div key={index} className="space-y-3 rounded-xl border border-stone-200 p-4">
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-600">{messages.product}</span>
-                <select
-                  value={line.productId}
+            <div key={index} className="space-y-3 rounded-xl border-2 border-stone-950 p-4">
+              <div className="block text-base">
+                <span className="mb-1 block font-semibold text-stone-950">{messages.product}</span>
+                <input
+                  className={fieldClass}
+                  value={line.productQuery}
                   onChange={(e) => {
-                    const product = products.find((item) => item.id === e.target.value);
+                    const value = e.target.value;
+                    const selected = products.find((item) => item.id === line.productId);
                     updateLine(index, {
-                      productId: e.target.value,
-                      categoryId: product?.category_id ?? "",
+                      productQuery: value,
+                      productId: selected && value === selected.name ? line.productId : "",
                     });
                   }}
-                  className={fieldClass}
+                  placeholder={messages.searchProducts}
                   required
-                >
-                  {Object.entries(productGroups).map(([categoryName, group]) => (
-                    <optgroup key={categoryName} label={categoryName}>
-                      {group.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-sm">
-                <span className="mb-1 block text-stone-600">{messages.category}</span>
+                />
+                {line.productQuery.trim() &&
+                line.productQuery !== products.find((item) => item.id === line.productId)?.name ? (
+                  <div className="mt-2 overflow-hidden rounded-lg border-2 border-stone-950">
+                    {filterProducts(products, line.productQuery).map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        className="block w-full border-b-2 border-stone-950 px-3 py-3 text-start text-base font-medium text-stone-950 last:border-b-0 hover:bg-stone-100"
+                        onClick={() =>
+                          updateLine(index, {
+                            productId: product.id,
+                            productQuery: product.name,
+                            categoryId: product.category_id ?? "",
+                          })
+                        }
+                      >
+                        {product.name}
+                      </button>
+                    ))}
+                    {resolveProductChoice(products, "", line.productQuery).kind === "create" ? (
+                      <p className="border-t-2 border-stone-950 px-3 py-3 text-base font-semibold text-stone-950">
+                        {messages.createProduct}: {line.productQuery.trim()}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <label className="block text-base">
+                <span className="mb-1 block font-semibold text-stone-950">{messages.category}</span>
                 <select
                   value={line.categoryId}
                   onChange={(e) => updateLine(index, { categoryId: e.target.value })}
@@ -325,8 +456,8 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
                 </select>
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="mb-1 block text-stone-600">{messages.qty}</span>
+                <label className="block text-base">
+                  <span className="mb-1 block font-semibold text-stone-950">{messages.qty}</span>
                   <input
                     dir="ltr"
                     type="number"
@@ -338,8 +469,16 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
                     required
                   />
                 </label>
-                <label className="block text-sm">
-                  <span className="mb-1 block text-stone-600">{messages.unitPrice}</span>
+                <label className="block text-base">
+                  <span className="mb-1 block font-semibold text-stone-950">{messages.serial}</span>
+                  <input
+                    className={fieldClass}
+                    value={line.serial}
+                    onChange={(e) => updateLine(index, { serial: e.target.value })}
+                  />
+                </label>
+                <label className="block text-base">
+                  <span className="mb-1 block font-semibold text-stone-950">{messages.unitPrice}</span>
                   <input
                     dir="ltr"
                     inputMode="decimal"
@@ -350,55 +489,43 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
                   />
                 </label>
               </div>
-              <div className="text-sm">
-                <span className="mb-1 block text-stone-600">{messages.currency}</span>
-                <div className="grid grid-cols-2 rounded-lg bg-stone-100 p-1" role="group">
-                  {(["EGP", "SAR"] as const).map((currency) => {
-                    const selected = line.currency === currency;
-                    return (
-                      <button
-                        key={currency}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => updateLine(index, { currency })}
-                        className={
-                          selected
-                            ? "rounded-md bg-white py-2 text-sm font-medium text-teal-950 shadow-sm"
-                            : "rounded-md py-2 text-sm text-stone-600"
-                        }
-                      >
-                        {currency === "EGP" ? messages.currencyEgp : messages.currencySar}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="text-base">
+                <span className="mb-1 block font-semibold text-stone-950">{messages.currency}</span>
+                <CurrencyChoice
+                  value={line.currency}
+                  onChange={(currency) => updateLine(index, { currency })}
+                  egpLabel={messages.currencyEgp}
+                  sarLabel={messages.currencySar}
+                />
               </div>
-              <div className="grid gap-2 rounded-lg bg-stone-50 p-3 text-sm sm:grid-cols-3">
+              <div className="grid gap-2 rounded-lg border-2 border-stone-950 bg-white p-3 text-base sm:grid-cols-3">
                 <div>
-                  <p className="text-stone-500">{messages.goodsTotal}</p>
-                  <p className="font-medium tabular-nums">
+                  <p className="font-semibold text-stone-950">{messages.goodsTotal}</p>
+                  <p className="text-lg font-semibold tabular-nums">
                     {moneyOrDash(quoted?.goodsLineCents ?? null, "EGP", locale)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-stone-500">{messages.finalUnitCost}</p>
-                  <p className="font-medium tabular-nums">
+                  <p className="font-semibold text-stone-950">{messages.finalUnitCost}</p>
+                  <p className="text-lg font-semibold tabular-nums">
                     {moneyOrDash(quoted?.unitCostCents ?? null, "EGP", locale)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-stone-500">{messages.lineTotal}</p>
-                  <p className="font-medium tabular-nums">
+                  <p className="font-semibold text-stone-950">{messages.lineTotal}</p>
+                  <p className="text-lg font-semibold tabular-nums">
                     {moneyOrDash(quoted?.lineTotalCents ?? null, "EGP", locale)}
                   </p>
                 </div>
               </div>
               {hint ? (
-                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">{hint}</p>
+                <p className="rounded-lg border-2 border-amber-800 bg-white px-3 py-2 text-base font-medium text-stone-950">
+                  {hint}
+                </p>
               ) : null}
               <button
                 type="button"
-                className="text-sm text-red-700"
+                className="text-base font-semibold text-red-800"
                 onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
                 disabled={lines.length === 1}
               >
@@ -409,64 +536,66 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
         })}
         <button
           type="button"
-          className="text-sm font-medium text-teal-800 underline"
+          className="text-base font-semibold text-stone-950 underline"
           onClick={() => setLines((current) => [...current, blankLine(products[0])])}
         >
           {messages.addLine}
         </button>
       </section>
-      <section
-        className={
-          quote.isBalanced
-            ? "sticky bottom-4 z-10 space-y-3 rounded-2xl border border-teal-200 bg-teal-50 p-5 shadow-md"
-            : "sticky bottom-4 z-10 space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-md"
-        }
-      >
-        <h3 className="text-lg font-semibold text-teal-950">{messages.balanceSection}</h3>
-        <dl className="space-y-1 text-sm">
+      <section className="space-y-3 rounded-2xl border-4 border-stone-950 bg-white p-5">
+        <h3 className="text-xl font-semibold text-stone-950">{messages.balanceSection}</h3>
+        <dl className="space-y-1 text-base">
           <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">{messages.goodsTotal}</dt>
-            <dd className="tabular-nums font-medium">
+            <dt className="font-semibold text-stone-950">{messages.goodsTotal}</dt>
+            <dd className="text-lg font-semibold tabular-nums">
               {quote.goodsKnown
                 ? formatPurchaseCents(quote.goodsEgpCents, "EGP", locale)
                 : "—"}
             </dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">{messages.transportation}</dt>
-            <dd className="tabular-nums font-medium">
+            <dt className="font-semibold text-stone-950">{messages.transportation}</dt>
+            <dd className="text-lg font-semibold tabular-nums">
               {quote.transportKnown
                 ? formatPurchaseCents(quote.transportEgpCents, "EGP", locale)
                 : "—"}
             </dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-stone-600">{messages.paidTotal}</dt>
-            <dd className="tabular-nums font-medium">
+            <dt className="font-semibold text-stone-950">{messages.paidTotal}</dt>
+            <dd className="text-lg font-semibold tabular-nums">
               {quote.goodsKnown && quote.transportKnown
                 ? formatPurchaseCents(quote.paidEgpCents, "EGP", locale)
                 : "—"}
             </dd>
           </div>
-          <div className="flex justify-between gap-4 border-t border-stone-200 pt-2">
-            <dt className="text-stone-600">{messages.invoiceInEgp}</dt>
-            <dd className="tabular-nums font-semibold">
+          <div className="flex justify-between gap-4 border-t-2 border-stone-950 pt-2">
+            <dt className="font-semibold text-stone-950">{messages.invoiceInEgp}</dt>
+            <dd className="text-lg font-semibold tabular-nums">
               {quote.invoiceKnown
                 ? formatPurchaseCents(quote.invoiceTotalEgpCents, "EGP", locale)
                 : "—"}
             </dd>
           </div>
         </dl>
-        <p className={quote.isBalanced ? "text-sm font-medium text-teal-900" : "text-sm font-medium text-amber-950"}>
+        <p
+          className={
+            quote.isBalanced
+              ? "text-base font-semibold text-green-800"
+              : "text-base font-semibold text-red-800"
+          }
+        >
           {balanceMessage}
         </p>
         {error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          <p className="rounded-lg border-2 border-red-800 bg-white px-3 py-2 text-base font-medium text-red-800">
+            {error}
+          </p>
         ) : null}
         <button
           type="submit"
-          disabled={isSaving || products.length === 0 || !quote.isBalanced}
-          className="w-full rounded-lg bg-teal-950 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
+          disabled={isSaving || !quote.isBalanced}
+          className="w-full rounded-lg bg-stone-950 px-4 py-4 text-base font-semibold text-white disabled:opacity-50"
         >
           {isSaving ? messages.saving : messages.receiveGoods}
         </button>

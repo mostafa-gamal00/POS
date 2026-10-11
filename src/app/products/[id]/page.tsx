@@ -36,6 +36,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
         ) : null}
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-4">
+            <dt className="text-stone-500">{messages.serial}</dt>
+            <dd>{product.serial ?? "—"}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
             <dt className="text-stone-500">{messages.category}</dt>
             <dd>{product.categories?.name ?? messages.uncategorized}</dd>
           </div>

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { cn, formatDateTime, formatMoney, formatPurchaseMoney } from "./utils";
+import {
+  cn,
+  formatDateTime,
+  formatEnteredPurchaseMoney,
+  formatMoney,
+  formatPurchaseMoney,
+} from "./utils";
 
 describe("formatMoney", () => {
   it("formats a number as USD", () => {
@@ -21,6 +27,14 @@ describe("formatPurchaseMoney", () => {
     expect(formatPurchaseMoney(135, "EGP", "ar")).toBe("135.00 ج.م");
     expect(formatPurchaseMoney(10, "SAR", "en")).toBe("SAR 10.00");
     expect(formatPurchaseMoney(10, "SAR", "ar")).toBe("10.00 ر.س");
+  });
+});
+
+describe("formatEnteredPurchaseMoney", () => {
+  it("uses the currency that was entered", () => {
+    expect(formatEnteredPurchaseMoney("EGP", null, 80, "en")).toBe("EGP 80.00");
+    expect(formatEnteredPurchaseMoney("SAR", 10, 135, "en")).toBe("SAR 10.00");
+    expect(formatEnteredPurchaseMoney(null, 10, 135, "en")).toBe("SAR 10.00");
   });
 });
 

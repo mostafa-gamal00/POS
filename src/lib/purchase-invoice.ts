@@ -11,9 +11,11 @@ export type PurchaseQuoteLineInput = {
 };
 
 export type PurchaseQuoteInput = {
-  invoiceTotalSar: string;
+  invoiceTotal: string;
+  invoiceCurrency: PurchaseCurrency;
   exchangeRate: string;
-  transportSar: string;
+  transport: string;
+  transportCurrency: PurchaseCurrency;
   lines: PurchaseQuoteLineInput[];
 };
 
@@ -37,13 +39,18 @@ export type PurchaseQuote = {
   invoiceKnown: boolean;
   transportKnown: boolean;
   goodsKnown: boolean;
+  needsRate: boolean;
   invoiceTotalEgpCents: number;
   transportEgpCents: number;
   goodsEgpCents: number;
   paidEgpCents: number;
   gapCents: number;
+  invoiceTotal: string;
+  invoiceCurrency: PurchaseCurrency;
   invoiceTotalSar: string;
   exchangeRate: string;
+  transport: string;
+  transportCurrency: PurchaseCurrency;
   transportSar: string;
   lines: PurchaseQuoteLine[];
 };
@@ -100,19 +107,42 @@ function asCents(value: bigint | null): number | null {
   return Number(value);
 }
 
+function readCurrency(value: PurchaseCurrency): PurchaseCurrency | null {
+  return purchaseCurrencies.includes(value) ? value : null;
+}
+
+function canonicalMoney(amount: bigint | null): string {
+  return amount === null ? "" : scaledToDecimal(amount, MONEY_SCALE);
+}
+
+function toEgpCents(
+  amount: bigint | null,
+  currency: PurchaseCurrency | null,
+  rate: bigint | null,
+): bigint | null {
+  if (amount === null || currency === null || amount < BigInt(0)) {
+    return null;
+  }
+  if (currency === "EGP") {
+    return amount;
+  }
+  if (rate === null || rate <= BigInt(0)) {
+    return null;
+  }
+  return multiplyToCents(amount, MONEY_SCALE, rate);
+}
+
 export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
-  const invoiceSar = parseScaled(input.invoiceTotalSar, MONEY_SCALE, true);
-  const transportSar = parseScaled(input.transportSar, MONEY_SCALE, true);
+  const invoiceCurrency = readCurrency(input.invoiceCurrency);
+  const transportCurrency = readCurrency(input.transportCurrency);
+  const invoiceAmount = parseScaled(input.invoiceTotal, MONEY_SCALE, true);
+  const transportAmount = parseScaled(input.transport, MONEY_SCALE, true);
   const rate = parseScaled(input.exchangeRate, RATE_SCALE, false);
   const hasRate = rate !== null && rate > BigInt(0);
-  const headerReady =
-    invoiceSar !== null &&
-    transportSar !== null &&
-    invoiceSar >= BigInt(0) &&
-    transportSar >= BigInt(0);
-  const invoiceEgp = headerReady && hasRate && rate ? multiplyToCents(invoiceSar, MONEY_SCALE, rate) : null;
-  const transportEgp =
-    headerReady && hasRate && rate ? multiplyToCents(transportSar, MONEY_SCALE, rate) : null;
+  const activeRate = hasRate ? rate : null;
+  const headerReady = invoiceAmount !== null && transportAmount !== null;
+  const invoiceEgp = headerReady ? toEgpCents(invoiceAmount, invoiceCurrency, activeRate) : null;
+  const transportEgp = headerReady ? toEgpCents(transportAmount, transportCurrency, activeRate) : null;
   const parsedLines = input.lines.map((line) => {
     const qty = Number.isInteger(line.qty) && line.qty > 0 ? line.qty : null;
     const price = parseScaled(line.unitPrice, MONEY_SCALE, false);
@@ -123,17 +153,15 @@ export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
     (line) =>
       line.qty !== null && line.price !== null && line.price >= BigInt(0) && line.currency !== null,
   );
+  const needsRate =
+    invoiceCurrency === "SAR" ||
+    transportCurrency === "SAR" ||
+    parsedLines.some((line) => line.currency === "SAR");
   const goodsUnits = parsedLines.map((line) => {
-    if (line.qty === null || line.price === null || line.currency === null) {
+    if (line.qty === null) {
       return null;
     }
-    if (line.currency === "EGP") {
-      return line.price;
-    }
-    if (!hasRate || !rate) {
-      return null;
-    }
-    return multiplyToCents(line.price, MONEY_SCALE, rate);
+    return toEgpCents(line.price, line.currency, activeRate);
   });
   let goodsEgp: bigint | null = input.lines.length > 0 ? BigInt(0) : null;
   for (let index = 0; index < parsedLines.length; index += 1) {
@@ -189,7 +217,7 @@ export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
   const gapCents = invoiceCents - paidCents;
   const isComplete =
     headerReady &&
-    hasRate &&
+    (!needsRate || hasRate) &&
     linesReady &&
     input.lines.length > 0 &&
     invoiceEgp !== null &&
@@ -199,6 +227,7 @@ export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
     isComplete,
     isBalanced: isComplete && gapCents === 0,
     hasRate,
+    needsRate,
     invoiceKnown: invoiceEgp !== null,
     transportKnown: transportEgp !== null,
     goodsKnown: goodsEgp !== null,
@@ -207,9 +236,13 @@ export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
     goodsEgpCents: goodsCents,
     paidEgpCents: paidCents,
     gapCents,
-    invoiceTotalSar: invoiceSar === null ? "" : scaledToDecimal(invoiceSar, MONEY_SCALE),
+    invoiceTotal: canonicalMoney(invoiceAmount),
+    invoiceCurrency: invoiceCurrency ?? "EGP",
+    invoiceTotalSar: invoiceCurrency === "SAR" ? canonicalMoney(invoiceAmount) : "",
     exchangeRate: rate === null ? "" : scaledToDecimal(rate, RATE_SCALE),
-    transportSar: transportSar === null ? "" : scaledToDecimal(transportSar, MONEY_SCALE),
+    transport: canonicalMoney(transportAmount),
+    transportCurrency: transportCurrency ?? "EGP",
+    transportSar: transportCurrency === "SAR" ? canonicalMoney(transportAmount) : "",
     lines,
   };
 }

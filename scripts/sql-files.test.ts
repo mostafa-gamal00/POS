@@ -14,6 +14,8 @@ describe("listSqlFiles", () => {
       "20260925140000_categories.sql",
       "20260925160000_sold_price.sql",
       "20261011192500_purchase_currency.sql",
+      "20261011211500_purchase_header_currency.sql",
+      "20261011230000_purchase_line_serial.sql",
     ]);
   });
 

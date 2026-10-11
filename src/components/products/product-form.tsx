@@ -19,6 +19,7 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
   const [categoryId, setCategoryId] = useState(product?.category_id ?? "");
   const [name, setName] = useState(product?.name ?? "");
   const [sku, setSku] = useState(product?.sku ?? "");
+  const [serial, setSerial] = useState(product?.serial ?? "");
   const [barcode, setBarcode] = useState(product?.barcode ?? "");
   const [price, setPrice] = useState(String(product?.price ?? "0"));
   const [cost, setCost] = useState(String(product?.cost ?? ""));
@@ -77,6 +78,7 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
       category_id: categoryId,
       name: name.trim(),
       sku: sku.trim() || null,
+      serial: serial.trim() || null,
       barcode: barcode.trim() || null,
       price: Number(price),
       cost: cost === "" ? null : Number(cost),
@@ -154,6 +156,15 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
             className="w-full rounded-md border border-slate-300 px-3 py-2"
             value={sku}
             onChange={(e) => setSku(e.target.value)}
+            disabled={!canManage}
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-slate-600">{messages.serial}</span>
+          <input
+            className="w-full rounded-md border border-slate-300 px-3 py-2"
+            value={serial}
+            onChange={(e) => setSerial(e.target.value)}
             disabled={!canManage}
           />
         </label>

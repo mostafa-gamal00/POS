@@ -4,7 +4,7 @@ import { ViewLink } from "@/components/products/view-link";
 import { hasPermission, requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, formatMoney, formatPurchaseMoney } from "@/lib/utils";
+import { formatDateTime, formatEnteredPurchaseMoney, formatMoney, formatPurchaseMoney } from "@/lib/utils";
 import type { Purchase } from "@/types/database";
 
 export default async function PurchasesPage() {
@@ -70,16 +70,26 @@ export default async function PurchasesPage() {
                   ].join(", ") || messages.uncategorized}
                 </td>
                 <td className="px-4 py-3 tabular-nums">
-                  {purchase.invoice_total_sar != null
-                    ? formatPurchaseMoney(purchase.invoice_total_sar, "SAR", locale)
+                  {purchase.invoice_total_egp != null
+                    ? formatEnteredPurchaseMoney(
+                        purchase.invoice_currency,
+                        purchase.invoice_total_sar,
+                        purchase.invoice_total_egp,
+                        locale,
+                      )
                     : "—"}
                 </td>
                 <td className="px-4 py-3 tabular-nums" dir="ltr">
                   {purchase.exchange_rate != null ? Number(purchase.exchange_rate) : "—"}
                 </td>
                 <td className="px-4 py-3 tabular-nums">
-                  {purchase.transport_sar != null
-                    ? formatPurchaseMoney(purchase.transport_sar, "SAR", locale)
+                  {purchase.invoice_total_egp != null
+                    ? formatEnteredPurchaseMoney(
+                        purchase.transport_currency,
+                        purchase.transport_sar,
+                        purchase.transport_egp,
+                        locale,
+                      )
                     : "—"}
                 </td>
                 <td className="px-4 py-3 tabular-nums">

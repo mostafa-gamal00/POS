@@ -31,6 +31,19 @@ export function formatPurchaseCents(
   return locale === "ar" ? `${amount} ${label}` : `${label} ${amount}`;
 }
 
+export function formatEnteredPurchaseMoney(
+  currency: PurchaseCurrency | null,
+  sarAmount: number | null,
+  egpAmount: number | null,
+  locale: Locale,
+): string {
+  const entered = currency ?? (sarAmount != null ? "SAR" : "EGP");
+  if (entered === "SAR") {
+    return sarAmount == null ? "—" : formatPurchaseMoney(sarAmount, "SAR", locale);
+  }
+  return egpAmount == null ? "—" : formatPurchaseMoney(egpAmount, "EGP", locale);
+}
+
 export function formatMoney(value: number | string): string {
   const amount = typeof value === "string" ? Number(value) : value;
   return new Intl.NumberFormat("en-US", {
