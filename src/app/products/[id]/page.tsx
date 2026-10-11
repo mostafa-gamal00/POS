@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DeleteProductButton } from "@/components/products/delete-product-button";
 import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProductImage } from "@/components/products/product-image";
@@ -80,6 +81,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
               ],
             ]}
           />
+          {canManage ? (
+            <DeleteProductButton productId={product.id} label={messages.delete} />
+          ) : null}
           {canManage ? (
             <Link
               href={`/products/${product.id}/edit`}

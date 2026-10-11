@@ -16,6 +16,8 @@ describe("listSqlFiles", () => {
       "20261011192500_purchase_currency.sql",
       "20261011211500_purchase_header_currency.sql",
       "20261011230000_purchase_line_serial.sql",
+      "20261011235000_test_deletes_and_logs.sql",
+      "20261012001000_admin_accounts.sql",
     ]);
   });
 

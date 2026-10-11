@@ -59,6 +59,7 @@ export type Product = {
   image_path: string | null;
   image_url: string | null;
   is_active: boolean;
+  is_test: boolean;
   low_stock_threshold: number;
   categories?: Pick<Category, "id" | "name"> | null;
   created_at: string;
@@ -80,6 +81,7 @@ export type Sale = {
   sold_by: string;
   total_amount: number;
   payment_method: PaymentMethod;
+  is_test: boolean;
   created_at: string;
 };
 
@@ -110,6 +112,7 @@ export type Purchase = {
   transport_sar: number | null;
   transport_currency: PurchaseCurrency | null;
   transport_egp: number | null;
+  is_test: boolean;
   created_at: string;
   suppliers?: Pick<Supplier, "id" | "name"> | null;
 };

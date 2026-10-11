@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { TestInvoiceActions } from "@/components/records/test-invoice-actions";
 import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ReceiptPrint } from "@/components/receipts/receipt-print";
-import { requirePermission } from "@/lib/auth";
+import { hasPermission, requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatEnteredPurchaseMoney, formatMoney, formatPurchaseMoney } from "@/lib/utils";
@@ -83,6 +84,16 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
               ? formatPurchaseMoney(Number(item.transport_egp), "EGP", locale)
               : "",
           ])}
+        />
+        <TestInvoiceActions
+          kind="purchase"
+          id={purchaseRow.id}
+          isTest={purchaseRow.is_test}
+          canMark={hasPermission(auth, "purchases.manage")}
+          canDelete={hasPermission(auth, "purchases.manage")}
+          testLabel={messages.testRecord}
+          deleteLabel={messages.delete}
+          backHref="/purchases"
         />
       </div>
       <ReceiptPrint

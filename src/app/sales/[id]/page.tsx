@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { TestInvoiceActions } from "@/components/records/test-invoice-actions";
 import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ReceiptPrint } from "@/components/receipts/receipt-print";
-import { requirePermission } from "@/lib/auth";
+import { hasPermission, requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateTime, formatMoney } from "@/lib/utils";
@@ -57,6 +58,16 @@ export default async function SaleDetailPage({ params }: PageProps) {
             formatMoney(Number(item.unit_price)),
             formatMoney(Number(item.line_total)),
           ])}
+        />
+        <TestInvoiceActions
+          kind="sale"
+          id={saleRow.id}
+          isTest={saleRow.is_test}
+          canMark={hasPermission(auth, "pos.sell")}
+          canDelete={hasPermission(auth, "pos.sell")}
+          testLabel={messages.testRecord}
+          deleteLabel={messages.delete}
+          backHref="/sales"
         />
       </div>
       <ReceiptPrint

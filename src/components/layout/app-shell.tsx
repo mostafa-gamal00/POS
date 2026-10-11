@@ -18,6 +18,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", labelKey: "navDashboard", permission: "dashboard.view" },
+  { href: "/logs", labelKey: "navLogs", permission: "dashboard.view" },
   { href: "/pos", labelKey: "navPos", permission: "pos.sell" },
   { href: "/products", labelKey: "navProducts", permission: "products.view" },
   { href: "/sales", labelKey: "navSales", permission: "sales.view" },

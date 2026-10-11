@@ -25,6 +25,7 @@ export function PosClient({ products }: PosClientProps) {
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [isTest, setIsTest] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const filtered = useMemo(() => {
@@ -99,12 +100,24 @@ export function PosClient({ products }: PosClientProps) {
         unit_price: item.soldPrice,
       })),
     });
-    setIsSubmitting(false);
-    if (rpcError) {
-      setError(rpcError.message);
+    if (rpcError || !data) {
+      setError(rpcError?.message ?? messages.saleSaveFailed);
+      setIsSubmitting(false);
       return;
     }
     const result = data as SaleRpcResult;
+    if (isTest) {
+      const { error: testError } = await supabase.rpc("set_sale_test", {
+        p_id: result.id,
+        p_is_test: true,
+      });
+      if (testError) {
+        setError(testError.message);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    setIsSubmitting(false);
     setCart([]);
     router.push(`/sales/${result.id}`);
     router.refresh();
@@ -209,6 +222,14 @@ export function PosClient({ products }: PosClientProps) {
               <option value="card">{messages.card}</option>
               <option value="other">{messages.other}</option>
             </select>
+          </label>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isTest}
+              onChange={(e) => setIsTest(e.target.checked)}
+            />
+            {messages.testRecord}
           </label>
           <div className="mt-4 flex items-center justify-between text-lg font-semibold">
             <span>{messages.total}</span>

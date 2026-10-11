@@ -28,6 +28,7 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
     String(product?.low_stock_threshold ?? "5"),
   );
   const [isActive, setIsActive] = useState(product?.is_active ?? true);
+  const [isTest, setIsTest] = useState(product?.is_test ?? false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -85,6 +86,7 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
       stock_qty: product ? product.stock_qty : Number(stockQty),
       low_stock_threshold: Number(threshold),
       is_active: isActive,
+      is_test: isTest,
       image_path: imagePath,
       image_url: imageUrl,
     };
@@ -241,6 +243,15 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
           disabled={!canManage}
         />
         {messages.active}
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={isTest}
+          onChange={(e) => setIsTest(e.target.checked)}
+          disabled={!canManage}
+        />
+        {messages.testRecord}
       </label>
       <label className="block text-sm">
         <span className="mb-1 block text-slate-600">{messages.image}</span>

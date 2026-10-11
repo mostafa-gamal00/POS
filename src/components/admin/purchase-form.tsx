@@ -106,6 +106,7 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
   const [newSupplierName, setNewSupplierName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTest, setIsTest] = useState(false);
   const quote = useMemo(
     () =>
       quotePurchaseInvoice({
@@ -252,6 +253,17 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
         return;
       }
       const result = data as PurchaseRpcResult;
+      if (isTest) {
+        const { error: testError } = await supabase.rpc("set_purchase_test", {
+          p_id: result.id,
+          p_is_test: true,
+        });
+        if (testError) {
+          setError(testError.message);
+          setIsSaving(false);
+          return;
+        }
+      }
       router.push(`/purchases/${result.id}`);
       router.refresh();
     } catch (err) {
@@ -377,6 +389,14 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
             ) : null}
           </div>
         </div>
+        <label className="flex items-center gap-2 text-base font-semibold text-stone-950">
+          <input
+            type="checkbox"
+            checked={isTest}
+            onChange={(e) => setIsTest(e.target.checked)}
+          />
+          {messages.testRecord}
+        </label>
         <label className="block text-base">
           <span className="mb-1 block font-semibold text-stone-950">{messages.notes}</span>
           <textarea
