@@ -5,14 +5,20 @@ import { ExportButton } from "@/components/export-button";
 import { AppShell } from "@/components/layout/app-shell";
 import { ReceiptPrint } from "@/components/receipts/receipt-print";
 import { hasPermission, requirePermission } from "@/lib/auth";
+import { fill } from "@/lib/i18n";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime, formatEnteredPurchaseMoney, formatMoney, formatPurchaseMoney } from "@/lib/utils";
+import { formatDateTime, formatEnteredPurchaseMoney, formatMoney, formatPurchaseCents, formatPurchaseMoney } from "@/lib/utils";
 import type { Purchase, PurchaseItem, ShopSettings } from "@/types/database";
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
+
+function moneyCents(value: number | string | null | undefined): number {
+  const amount = Number(value ?? 0);
+  return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
+}
 
 export default async function PurchaseDetailPage({ params }: PageProps) {
   const auth = await requirePermission("purchases.view");
@@ -39,6 +45,18 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
   const purchaseRow = purchase as Purchase;
   const purchaseItems = (items ?? []) as PurchaseItem[];
   const hasCurrencyInvoice = purchaseRow.invoice_total_egp != null;
+  const gapCents = hasCurrencyInvoice
+    ? moneyCents(purchaseRow.invoice_total_egp) -
+      purchaseItems.reduce((sum, item) => sum + moneyCents(item.line_total), 0)
+    : 0;
+  const differenceText = !hasCurrencyInvoice
+    ? null
+    : gapCents === 0
+      ? messages.invoiceBalanced
+      : fill(messages.invoiceDifference, {
+          sign: gapCents > 0 ? "+" : "-",
+          amount: formatPurchaseCents(Math.abs(gapCents), "EGP", locale),
+        });
   const shop = (settings ?? {
     shop_name: "My Shop",
     receipt_footer: "Goods received",
@@ -53,6 +71,14 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
         <Link href="/purchases" className="text-sm text-slate-600 underline">
           {messages.backToPurchases}
         </Link>
+        {hasPermission(auth, "purchases.manage") ? (
+          <Link
+            href={`/purchases/${purchaseRow.id}/edit`}
+            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+          >
+            {messages.editInvoice}
+          </Link>
+        ) : null}
         <ExportButton
           label={messages.exportData}
           filename={`${purchaseRow.receipt_number}.csv`}
@@ -140,6 +166,9 @@ export default async function PurchaseDetailPage({ params }: PageProps) {
                     locale,
                   ),
                 },
+                ...(differenceText
+                  ? [{ label: messages.balanceSection, value: differenceText }]
+                  : []),
               ]
             : []),
         ]}

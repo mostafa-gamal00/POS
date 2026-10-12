@@ -14,14 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPurchaseCents } from "@/lib/utils";
 import type { Category, Product, PurchaseRpcResult, Supplier } from "@/types/database";
 
-type PurchaseFormProps = {
-  products: Product[];
-  suppliers: Supplier[];
-  categories: Category[];
-  locale: Locale;
-};
-
-type Line = {
+export type PurchaseFormLine = {
   productId: string;
   productQuery: string;
   categoryId: string;
@@ -30,6 +23,29 @@ type Line = {
   currency: PurchaseCurrency;
   serial: string;
 };
+
+export type PurchaseFormDraft = {
+  id: string;
+  isTest: boolean;
+  supplierId: string;
+  notes: string;
+  invoiceTotal: string;
+  invoiceCurrency: PurchaseCurrency;
+  exchangeRate: string;
+  transport: string;
+  transportCurrency: PurchaseCurrency;
+  lines: PurchaseFormLine[];
+};
+
+type PurchaseFormProps = {
+  products: Product[];
+  suppliers: Supplier[];
+  categories: Category[];
+  locale: Locale;
+  draft?: PurchaseFormDraft | null;
+};
+
+type Line = PurchaseFormLine;
 
 const fieldClass =
   "w-full rounded-lg border-2 border-stone-950 bg-white px-3 py-3 text-base text-stone-950 outline-none focus:border-teal-800 focus:ring-2 focus:ring-teal-800/30";
@@ -92,21 +108,31 @@ function moneyOrDash(
   return formatPurchaseCents(cents, currency, locale);
 }
 
-export function PurchaseForm({ products, suppliers, categories, locale }: PurchaseFormProps) {
+export function PurchaseForm({
+  products,
+  suppliers,
+  categories,
+  locale,
+  draft = null,
+}: PurchaseFormProps) {
   const router = useRouter();
   const messages = useMessages();
-  const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
-  const [notes, setNotes] = useState("");
-  const [invoiceTotal, setInvoiceTotal] = useState("");
-  const [invoiceCurrency, setInvoiceCurrency] = useState<PurchaseCurrency>("EGP");
-  const [exchangeRate, setExchangeRate] = useState("");
-  const [transport, setTransport] = useState("0");
-  const [transportCurrency, setTransportCurrency] = useState<PurchaseCurrency>("EGP");
-  const [lines, setLines] = useState<Line[]>([blankLine(products[0])]);
+  const [supplierId, setSupplierId] = useState(draft?.supplierId ?? suppliers[0]?.id ?? "");
+  const [notes, setNotes] = useState(draft?.notes ?? "");
+  const [invoiceTotal, setInvoiceTotal] = useState(draft?.invoiceTotal ?? "");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<PurchaseCurrency>(draft?.invoiceCurrency ?? "EGP");
+  const [exchangeRate, setExchangeRate] = useState(draft?.exchangeRate ?? "");
+  const [transport, setTransport] = useState(draft?.transport ?? "0");
+  const [transportCurrency, setTransportCurrency] = useState<PurchaseCurrency>(
+    draft?.transportCurrency ?? "EGP",
+  );
+  const [lines, setLines] = useState<Line[]>(
+    draft && draft.lines.length > 0 ? draft.lines : [blankLine(products[0])],
+  );
   const [newSupplierName, setNewSupplierName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isTest, setIsTest] = useState(false);
+  const [isTest, setIsTest] = useState(draft?.isTest ?? false);
   const quote = useMemo(
     () =>
       quotePurchaseInvoice({
@@ -213,7 +239,7 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
   }
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!quote.isBalanced) {
+    if (!quote.isComplete) {
       return;
     }
     setIsSaving(true);
@@ -230,7 +256,15 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
       const resolvedSupplierId = await ensureSupplier();
       const supabase = createClient();
       const productIds = await ensureLineProducts(supabase);
-      const { data, error: rpcError } = await supabase.rpc("create_purchase", {
+      const items = lines.map((line, index) => ({
+        product_id: productIds[index],
+        category_id: line.categoryId || null,
+        qty: Number(line.qty),
+        unit_price: quote.lines[index]?.unitPrice ?? line.unitPrice,
+        currency: line.currency,
+        serial: line.serial.trim(),
+      }));
+      const payload = {
         p_supplier_id: resolvedSupplierId,
         p_notes: notes || null,
         p_invoice_total: quote.invoiceTotal,
@@ -238,25 +272,21 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
         p_exchange_rate: quote.needsRate ? quote.exchangeRate : "",
         p_transport: quote.transport,
         p_transport_currency: quote.transportCurrency,
-        p_items: lines.map((line, index) => ({
-          product_id: productIds[index],
-          category_id: line.categoryId || null,
-          qty: Number(line.qty),
-          unit_price: quote.lines[index]?.unitPrice ?? line.unitPrice,
-          currency: line.currency,
-          serial: line.serial.trim(),
-        })),
-      });
+        p_items: items,
+      };
+      const { data, error: rpcError } = draft
+        ? await supabase.rpc("update_purchase", { p_id: draft.id, ...payload })
+        : await supabase.rpc("create_purchase", payload);
       if (rpcError) {
         setError(rpcError.message);
         setIsSaving(false);
         return;
       }
       const result = data as PurchaseRpcResult;
-      if (isTest) {
+      if (isTest !== (draft?.isTest ?? false)) {
         const { error: testError } = await supabase.rpc("set_purchase_test", {
           p_id: result.id,
-          p_is_test: true,
+          p_is_test: isTest,
         });
         if (testError) {
           setError(testError.message);
@@ -275,13 +305,10 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
     ? messages.saveBlockedBalance
     : quote.isBalanced
       ? messages.invoiceBalanced
-      : quote.gapCents > 0
-        ? fill(messages.invoiceShort, {
-            amount: formatPurchaseCents(quote.gapCents, "EGP", locale),
-          })
-        : fill(messages.invoiceOver, {
-            amount: formatPurchaseCents(Math.abs(quote.gapCents), "EGP", locale),
-          });
+      : fill(messages.invoiceDifference, {
+          sign: quote.gapCents > 0 ? "+" : "-",
+          amount: formatPurchaseCents(Math.abs(quote.gapCents), "EGP", locale),
+        });
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-4 pb-8">
       <section className="space-y-4 rounded-2xl border-4 border-teal-900 bg-white p-5">
@@ -602,7 +629,9 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
           className={
             quote.isBalanced
               ? "text-base font-semibold text-green-800"
-              : "text-base font-semibold text-red-800"
+              : quote.isComplete
+                ? "text-base font-semibold text-amber-950"
+                : "text-base font-semibold text-red-800"
           }
         >
           {balanceMessage}
@@ -614,10 +643,10 @@ export function PurchaseForm({ products, suppliers, categories, locale }: Purcha
         ) : null}
         <button
           type="submit"
-          disabled={isSaving || !quote.isBalanced}
+          disabled={isSaving || !quote.isComplete}
           className="w-full rounded-lg bg-stone-950 px-4 py-4 text-base font-semibold text-white disabled:opacity-50"
         >
-          {isSaving ? messages.saving : messages.receiveGoods}
+          {isSaving ? messages.saving : draft ? messages.saveInvoice : messages.receiveGoods}
         </button>
       </section>
     </form>

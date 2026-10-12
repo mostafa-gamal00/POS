@@ -155,6 +155,9 @@ export const en = {
   invoiceBalanced: "Invoice is balanced",
   invoiceShort: "Short by {amount}",
   invoiceOver: "Over by {amount}",
+  invoiceDifference: "{sign} {amount}",
+  editInvoice: "Edit invoice",
+  saveInvoice: "Save invoice",
   saveBlockedBalance: "Match the invoice total before saving",
   transportHint:
     "Transportation for this product: {amount} ({perUnit} per unit × {qty})",
@@ -347,6 +350,9 @@ export const ar: Messages = {
   invoiceBalanced: "الفاتورة متوازنة",
   invoiceShort: "ينقص {amount}",
   invoiceOver: "يزيد {amount}",
+  invoiceDifference: "{sign} {amount}",
+  editInvoice: "تعديل الفاتورة",
+  saveInvoice: "حفظ الفاتورة",
   saveBlockedBalance: "طابق إجمالي الفاتورة قبل الحفظ",
   transportHint: "نقل هذا المنتج: {amount} ({perUnit} للوحدة × {qty})",
   transportHintExtra:
