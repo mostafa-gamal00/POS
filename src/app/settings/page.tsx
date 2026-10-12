@@ -19,6 +19,10 @@ export default async function SettingsPage() {
     id: 1,
     shop_name: "My Shop",
     receipt_footer: "Thank you for your business",
+    phone: "",
+    email: "",
+    address: "",
+    about: "",
     updated_at: new Date().toISOString(),
   }) as ShopSettings;
   return (

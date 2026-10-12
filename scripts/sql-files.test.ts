@@ -19,6 +19,7 @@ describe("listSqlFiles", () => {
       "20261011235000_test_deletes_and_logs.sql",
       "20261012001000_admin_accounts.sql",
       "20261012120000_unbalanced_purchase_edit.sql",
+      "20261012130000_storefront.sql",
     ]);
   });
 

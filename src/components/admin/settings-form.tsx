@@ -15,6 +15,10 @@ export function SettingsForm({ settings }: SettingsFormProps) {
   const messages = useMessages();
   const [shopName, setShopName] = useState(settings.shop_name);
   const [footer, setFooter] = useState(settings.receipt_footer);
+  const [phone, setPhone] = useState(settings.phone ?? "");
+  const [email, setEmail] = useState(settings.email ?? "");
+  const [address, setAddress] = useState(settings.address ?? "");
+  const [about, setAbout] = useState(settings.about ?? "");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -29,6 +33,10 @@ export function SettingsForm({ settings }: SettingsFormProps) {
       .update({
         shop_name: shopName,
         receipt_footer: footer,
+        phone,
+        email,
+        address,
+        about,
         updated_at: new Date().toISOString(),
       })
       .eq("id", 1);
@@ -61,6 +69,40 @@ export function SettingsForm({ settings }: SettingsFormProps) {
           value={footer}
           onChange={(e) => setFooter(e.target.value)}
           rows={3}
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="mb-1 block text-slate-600">{messages.phone}</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="mb-1 block text-slate-600">{messages.email}</span>
+        <input
+          type="email"
+          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="mb-1 block text-slate-600">{messages.address}</span>
+        <input
+          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+        />
+      </label>
+      <label className="block text-sm">
+        <span className="mb-1 block text-slate-600">{messages.aboutShop}</span>
+        <textarea
+          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          value={about}
+          onChange={(e) => setAbout(e.target.value)}
+          rows={4}
         />
       </label>
       {error ? (

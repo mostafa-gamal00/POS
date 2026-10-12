@@ -136,7 +136,27 @@ export type ShopSettings = {
   id: number;
   shop_name: string;
   receipt_footer: string;
+  phone: string;
+  email: string;
+  address: string;
+  about: string;
   updated_at: string;
+};
+
+export type StorefrontProduct = {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string | null;
+  category_name: string | null;
+};
+
+export type StorefrontSettings = {
+  shop_name: string;
+  phone: string;
+  email: string;
+  address: string;
+  about: string;
 };
 
 export type CartItem = {
