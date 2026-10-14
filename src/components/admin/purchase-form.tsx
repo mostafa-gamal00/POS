@@ -126,9 +126,7 @@ export function PurchaseForm({
   const [transportCurrency, setTransportCurrency] = useState<PurchaseCurrency>(
     draft?.transportCurrency ?? "EGP",
   );
-  const [lines, setLines] = useState<Line[]>(
-    draft && draft.lines.length > 0 ? draft.lines : [blankLine(products[0])],
-  );
+  const [lines, setLines] = useState<Line[]>(draft ? draft.lines : []);
   const [newSupplierName, setNewSupplierName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -217,6 +215,9 @@ export function PurchaseForm({
           name: choice.name,
           category_id: line.categoryId,
           price: 0,
+          price_currency: "EGP",
+          entered_price: 0,
+          price_exchange_rate: null,
           stock_qty: 0,
           serial: line.serial.trim() || null,
           is_active: true,
@@ -574,7 +575,6 @@ export function PurchaseForm({
                 type="button"
                 className="text-base font-semibold text-red-800"
                 onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
-                disabled={lines.length === 1}
               >
                 {messages.remove}
               </button>

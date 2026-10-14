@@ -54,6 +54,9 @@ export type Product = {
   serial: string | null;
   barcode: string | null;
   price: number;
+  price_currency: PurchaseCurrency;
+  entered_price: number;
+  price_exchange_rate: number | null;
   cost: number | null;
   stock_qty: number;
   image_path: string | null;

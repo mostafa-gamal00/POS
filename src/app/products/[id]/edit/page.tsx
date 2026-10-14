@@ -29,6 +29,7 @@ export default async function EditProductPage({ params }: PageProps) {
         product={data as Product}
         canManage={hasPermission(auth, "products.manage")}
         categories={(categoryRows ?? []) as Category[]}
+        locale={locale}
       />
     </AppShell>
   );

@@ -17,7 +17,7 @@ export default async function PosPage() {
     .order("name");
   return (
     <AppShell auth={auth} locale={locale} title={messages.navPos}>
-      <PosClient products={(data ?? []) as Product[]} />
+      <PosClient products={(data ?? []) as Product[]} locale={locale} />
     </AppShell>
   );
 }

@@ -7,6 +7,7 @@ import { hasPermission, requirePermission } from "@/lib/auth";
 import { fill } from "@/lib/i18n";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
+import { formatProductMoney } from "@/lib/product-price";
 import { formatMoney } from "@/lib/utils";
 import type { Category, Product } from "@/types/database";
 
@@ -61,7 +62,7 @@ export default async function ProductsPage() {
               product.sku ?? "",
               product.serial ?? "",
               product.barcode ?? "",
-              formatMoney(Number(product.price)),
+              formatProductMoney(product, locale),
               product.cost == null ? "" : formatMoney(Number(product.cost)),
               String(product.stock_qty),
               product.is_active ? messages.active : messages.inactive,
@@ -121,7 +122,7 @@ export default async function ProductsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">{formatMoney(Number(product.price))}</td>
+                      <td className="px-4 py-3">{formatProductMoney(product, locale)}</td>
                       <td className="px-4 py-3">{product.stock_qty}</td>
                       <td className="px-4 py-3">
                         {product.is_active ? messages.active : messages.inactive}

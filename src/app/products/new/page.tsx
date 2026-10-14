@@ -16,6 +16,7 @@ export default async function NewProductPage() {
       <ProductForm
         canManage={hasPermission(auth, "products.manage")}
         categories={(data ?? []) as Category[]}
+        locale={locale}
       />
     </AppShell>
   );

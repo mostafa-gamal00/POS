@@ -4,7 +4,7 @@ import { StoreShell } from "@/components/storefront/store-shell";
 import { getLocale, getMessages } from "@/lib/locale";
 import { loadStorefrontSettings } from "@/lib/storefront";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney } from "@/lib/utils";
+import { formatPurchaseMoney } from "@/lib/utils";
 import type { StorefrontProduct } from "@/types/database";
 
 type PageProps = {
@@ -47,7 +47,9 @@ export default async function ShopProductPage({ params }: PageProps) {
             {product.category_name || messages.uncategorized}
           </p>
           <h1 className="text-4xl font-semibold">{product.name}</h1>
-          <p className="text-3xl font-semibold text-amber-800">{formatMoney(product.price)}</p>
+          <p className="text-3xl font-semibold text-amber-800">
+            {formatPurchaseMoney(product.price, "EGP", locale)}
+          </p>
         </div>
       </article>
     </StoreShell>

@@ -3,14 +3,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useMessages } from "@/components/i18n/locale-provider";
-import { formatMoney } from "@/lib/utils";
+import type { Locale } from "@/lib/i18n";
+import { formatPurchaseMoney } from "@/lib/utils";
 import type { StorefrontProduct } from "@/types/database";
 
 type CatalogGridProps = {
   products: StorefrontProduct[];
+  locale: Locale;
 };
 
-export function CatalogGrid({ products }: CatalogGridProps) {
+export function CatalogGrid({ products, locale }: CatalogGridProps) {
   const messages = useMessages();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
@@ -88,7 +90,7 @@ export function CatalogGrid({ products }: CatalogGridProps) {
                   </p>
                   <h2 className="text-xl font-semibold">{product.name}</h2>
                   <p className="text-lg font-semibold text-amber-800">
-                    {formatMoney(product.price)}
+                    {formatPurchaseMoney(product.price, "EGP", locale)}
                   </p>
                 </div>
               </Link>

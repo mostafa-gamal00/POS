@@ -3,17 +3,34 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMessages } from "@/components/i18n/locale-provider";
-import { fill } from "@/lib/i18n";
+import { fill, type Locale } from "@/lib/i18n";
+import { convertProductPrice } from "@/lib/product-price";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, Product } from "@/types/database";
+import { formatPurchaseMoney } from "@/lib/utils";
+import type { Category, Product, PurchaseCurrency } from "@/types/database";
 
 type ProductFormProps = {
   product?: Product | null;
   canManage: boolean;
   categories: Category[];
+  locale: Locale;
 };
 
-export function ProductForm({ product, canManage, categories }: ProductFormProps) {
+function initialCurrency(product?: Product | null): PurchaseCurrency {
+  return product?.price_currency === "SAR" ? "SAR" : "EGP";
+}
+
+function initialEnteredPrice(product?: Product | null): string {
+  if (!product) {
+    return "0";
+  }
+  if (product.price_currency === "SAR") {
+    return String(product.entered_price);
+  }
+  return String(product.price ?? "0");
+}
+
+export function ProductForm({ product, canManage, categories, locale }: ProductFormProps) {
   const router = useRouter();
   const messages = useMessages();
   const [categoryId, setCategoryId] = useState(product?.category_id ?? "");
@@ -21,7 +38,11 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
   const [sku, setSku] = useState(product?.sku ?? "");
   const [serial, setSerial] = useState(product?.serial ?? "");
   const [barcode, setBarcode] = useState(product?.barcode ?? "");
-  const [price, setPrice] = useState(String(product?.price ?? "0"));
+  const [priceCurrency, setPriceCurrency] = useState<PurchaseCurrency>(initialCurrency(product));
+  const [price, setPrice] = useState(initialEnteredPrice(product));
+  const [exchangeRate, setExchangeRate] = useState(
+    product?.price_exchange_rate == null ? "" : String(product.price_exchange_rate),
+  );
   const [cost, setCost] = useState(String(product?.cost ?? ""));
   const [stockQty, setStockQty] = useState(String(product?.stock_qty ?? "0"));
   const [threshold, setThreshold] = useState(
@@ -40,6 +61,15 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
     if (!categoryId) {
       setError(messages.category);
       setIsSaving(false);
+      return;
+    }
+    const converted = convertProductPrice({
+      currency: priceCurrency,
+      enteredPrice: price,
+      exchangeRate,
+    });
+    if (!converted) {
+      setError(messages.invalidProductPrice);
       return;
     }
     setIsSaving(true);
@@ -81,7 +111,10 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
       sku: sku.trim() || null,
       serial: serial.trim() || null,
       barcode: barcode.trim() || null,
-      price: Number(price),
+      price: converted.price,
+      price_currency: converted.currency,
+      entered_price: converted.enteredPrice,
+      price_exchange_rate: converted.exchangeRate,
       cost: cost === "" ? null : Number(cost),
       stock_qty: product ? product.stock_qty : Number(stockQty),
       low_stock_threshold: Number(threshold),
@@ -114,6 +147,11 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
     router.push("/products");
     router.refresh();
   }
+  const converted = convertProductPrice({
+    currency: priceCurrency,
+    enteredPrice: price,
+    exchangeRate,
+  });
   if (!canManage && !product) {
     return <p className="text-sm text-slate-500">{messages.cannotManageProducts}</p>;
   }
@@ -180,33 +218,79 @@ export function ProductForm({ product, canManage, categories }: ProductFormProps
           />
         </label>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-sm">
-          <span className="mb-1 block text-slate-600">{messages.price}</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            required
-            disabled={!canManage}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="mb-1 block text-slate-600">{messages.cost}</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            className="w-full rounded-md border border-slate-300 px-3 py-2"
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            disabled={!canManage}
-          />
-        </label>
+      <div className="space-y-3">
+        <div className="block text-sm">
+          <span className="mb-1 block text-slate-600">{messages.currency}</span>
+          <div className="grid grid-cols-2 rounded-lg border-2 border-stone-950 p-1" role="group">
+            {(["EGP", "SAR"] as const).map((currency) => {
+              const selected = priceCurrency === currency;
+              return (
+                <button
+                  key={currency}
+                  type="button"
+                  aria-pressed={selected}
+                  disabled={!canManage}
+                  onClick={() => setPriceCurrency(currency)}
+                  className={
+                    selected
+                      ? "rounded-md bg-stone-950 py-2 text-sm font-semibold text-white"
+                      : "rounded-md py-2 text-sm font-medium text-stone-950"
+                  }
+                >
+                  {currency === "EGP" ? messages.currencyEgp : messages.currencySar}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="mb-1 block text-slate-600">{messages.price}</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full rounded-md border border-slate-300 px-3 py-2"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              required
+              disabled={!canManage}
+            />
+          </label>
+          {priceCurrency === "SAR" ? (
+            <label className="block text-sm">
+              <span className="mb-1 block text-slate-600">{messages.exchangeRate}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.000001"
+                className="w-full rounded-md border border-slate-300 px-3 py-2"
+                value={exchangeRate}
+                onChange={(e) => setExchangeRate(e.target.value)}
+                required
+                disabled={!canManage}
+              />
+              <span className="mt-1 block text-xs text-slate-500">{messages.exchangeRateHint}</span>
+            </label>
+          ) : null}
+        </div>
+        <p className="text-sm text-slate-600">
+          {messages.priceInEgp}:{" "}
+          {converted ? formatPurchaseMoney(converted.price, "EGP", locale) : "—"}
+        </p>
       </div>
+      <label className="block text-sm">
+        <span className="mb-1 block text-slate-600">{messages.cost}</span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          className="w-full rounded-md border border-slate-300 px-3 py-2"
+          value={cost}
+          onChange={(e) => setCost(e.target.value)}
+          disabled={!canManage}
+        />
+      </label>
       {!product ? (
         <label className="block text-sm">
           <span className="mb-1 block text-slate-600">{messages.openingStock}</span>

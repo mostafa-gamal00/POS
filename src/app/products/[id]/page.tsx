@@ -7,7 +7,7 @@ import { ProductImage } from "@/components/products/product-image";
 import { hasPermission, requirePermission } from "@/lib/auth";
 import { getLocale, getMessages } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
-import { formatMoney } from "@/lib/utils";
+import { formatProductMoney } from "@/lib/product-price";
 import type { Product } from "@/types/database";
 
 type PageProps = {
@@ -47,7 +47,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-stone-500">{messages.price}</dt>
-            <dd>{formatMoney(Number(product.price))}</dd>
+            <dd>{formatProductMoney(product, locale)}</dd>
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-stone-500">{messages.stock}</dt>
@@ -75,7 +75,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 product.name,
                 product.serial ?? "",
                 product.categories?.name ?? messages.uncategorized,
-                formatMoney(Number(product.price)),
+                formatProductMoney(product, locale),
                 String(product.stock_qty),
                 product.is_active ? messages.active : messages.inactive,
               ],

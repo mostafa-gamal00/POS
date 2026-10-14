@@ -180,4 +180,45 @@ describe("quotePurchaseInvoice", () => {
     expect(rated.transportSar).toBe("");
     expect(rated.isBalanced).toBe(true);
   });
+
+  it("accepts a transportation-only invoice, including zero", () => {
+    const zero = quote({
+      invoiceTotal: "0",
+      invoiceCurrency: "EGP",
+      exchangeRate: "",
+      transport: "0",
+      transportCurrency: "EGP",
+      lines: [],
+    });
+    expect(zero.goodsEgpCents).toBe(0);
+    expect(zero.transportEgpCents).toBe(0);
+    expect(zero.isComplete).toBe(true);
+    expect(zero.isBalanced).toBe(true);
+    expect(zero.needsRate).toBe(false);
+    const transportOnly = quote({
+      invoiceTotal: "40",
+      invoiceCurrency: "EGP",
+      exchangeRate: "",
+      transport: "40",
+      transportCurrency: "EGP",
+      lines: [],
+    });
+    expect(transportOnly.goodsEgpCents).toBe(0);
+    expect(transportOnly.paidEgpCents).toBe(4_000);
+    expect(transportOnly.isBalanced).toBe(true);
+  });
+
+  it("marks a transportation-only invoice unbalanced when the totals differ", () => {
+    const result = quote({
+      invoiceTotal: "50",
+      invoiceCurrency: "EGP",
+      exchangeRate: "",
+      transport: "40",
+      transportCurrency: "EGP",
+      lines: [],
+    });
+    expect(result.isComplete).toBe(true);
+    expect(result.isBalanced).toBe(false);
+    expect(result.gapCents).toBe(1_000);
+  });
 });

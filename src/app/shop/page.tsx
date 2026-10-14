@@ -12,7 +12,7 @@ export default async function ShopPage() {
   ]);
   return (
     <StoreShell locale={locale} messages={messages} shopName={settings.shop_name}>
-      <CatalogGrid products={products} />
+      <CatalogGrid products={products} locale={locale} />
     </StoreShell>
   );
 }

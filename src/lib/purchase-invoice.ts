@@ -149,10 +149,12 @@ export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
     const currency = purchaseCurrencies.includes(line.currency) ? line.currency : null;
     return { qty, price, currency, raw: line };
   });
-  const linesReady = parsedLines.every(
-    (line) =>
-      line.qty !== null && line.price !== null && line.price >= BigInt(0) && line.currency !== null,
-  );
+  const linesReady =
+    input.lines.length === 0 ||
+    parsedLines.every(
+      (line) =>
+        line.qty !== null && line.price !== null && line.price >= BigInt(0) && line.currency !== null,
+    );
   const needsRate =
     invoiceCurrency === "SAR" ||
     transportCurrency === "SAR" ||
@@ -163,11 +165,11 @@ export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
     }
     return toEgpCents(line.price, line.currency, activeRate);
   });
-  let goodsEgp: bigint | null = input.lines.length > 0 ? BigInt(0) : null;
+  let goodsEgp: bigint | null = BigInt(0);
   for (let index = 0; index < parsedLines.length; index += 1) {
     const line = parsedLines[index];
     const unit = goodsUnits[index];
-    if (goodsEgp === null || !line || unit === null || line.qty === null) {
+    if (!line || unit === null || line.qty === null) {
       goodsEgp = null;
       break;
     }
@@ -219,7 +221,6 @@ export function quotePurchaseInvoice(input: PurchaseQuoteInput): PurchaseQuote {
     headerReady &&
     (!needsRate || hasRate) &&
     linesReady &&
-    input.lines.length > 0 &&
     invoiceEgp !== null &&
     transportEgp !== null &&
     goodsEgp !== null;

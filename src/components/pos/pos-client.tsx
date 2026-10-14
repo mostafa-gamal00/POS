@@ -4,22 +4,21 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useMessages } from "@/components/i18n/locale-provider";
-import { fill } from "@/lib/i18n";
+import { fill, type Locale } from "@/lib/i18n";
 import { checkAddQty, checkCheckout } from "@/lib/stock-rules";
+import { formatPurchaseMoney } from "@/lib/utils";
 import type { CartItem, PaymentMethod, Product, SaleRpcResult } from "@/types/database";
 
 type PosClientProps = {
   products: Product[];
+  locale: Locale;
 };
 
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
+function formatMoney(value: number, locale: Locale): string {
+  return formatPurchaseMoney(value, "EGP", locale);
 }
 
-export function PosClient({ products }: PosClientProps) {
+export function PosClient({ products, locale }: PosClientProps) {
   const router = useRouter();
   const messages = useMessages();
   const [query, setQuery] = useState("");
@@ -153,7 +152,7 @@ export function PosClient({ products }: PosClientProps) {
               <div className="min-w-0">
                 <p className="truncate font-medium">{product.name}</p>
                 <p className="text-sm text-slate-600">
-                  {formatMoney(Number(product.price))} ·{" "}
+                  {formatMoney(Number(product.price), locale)} ·{" "}
                   {fill(messages.stockLabel, { count: product.stock_qty })}
                 </p>
               </div>
@@ -233,7 +232,7 @@ export function PosClient({ products }: PosClientProps) {
           </label>
           <div className="mt-4 flex items-center justify-between text-lg font-semibold">
             <span>{messages.total}</span>
-            <span>{formatMoney(total)}</span>
+            <span>{formatMoney(total, locale)}</span>
           </div>
           {error ? (
             <p className="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
